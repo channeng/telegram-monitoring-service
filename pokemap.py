@@ -121,13 +121,11 @@ def get_pokemons(geocode_latlon, radius_in_km, filter_iv=None, since=None):
 
     # Filter for pokemons greater than filtered IV
     if filter_iv:
-        print "filter_iv"
         pokemons_filtered = []
         for pokemon in pokemon_within_radius:
             if pokemon['iv'] >= int(filter_iv):
                 pokemons_filtered += [pokemon]
     else:
-        print "Don't filter"
         pokemons_filtered = pokemon_within_radius
 
     # Sort by distance from location
@@ -137,7 +135,7 @@ def get_pokemons(geocode_latlon, radius_in_km, filter_iv=None, since=None):
 
 
 if __name__ == "__main__":
-    address = "farrer park mrt sg"
+    address = "farrer park mrt"
     radius_in_km = 2
     geocode_latlon, formatted_address = get_location(address)
     # address = "6PH58V74+G3"

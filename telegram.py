@@ -20,7 +20,7 @@ Hi, you must be new! I'll need 2 things for you to get started.
 
 /setloc <address of current location>
     - Please enter your address or pluscode from google maps.
-    - Eg. /setloc 681 race course rd, singapore
+    - Eg. /setloc city hall mrt, singapore
 
 (2) Radius in KM
 
@@ -111,7 +111,7 @@ def get_updates(offset=None, timeout=None):
     return telegram_do(ep_get_updates, params=params)['result']
 
 
-def chat_action_list(chat_id, user, since=None, monitor=False):
+def chat_action_list(chat_id, user, since=None, monitor=False, nearest=10):
     geocode_latlon = user.get("loc", "")
     radius = user.get("radius", "")
     filter_iv = user.get("iv", None)
@@ -122,7 +122,7 @@ Unable to list nearby pokemons. You have not set your location and radius.
 
 Please set the address of your current location:
 /setloc <address>
-Eg. /setloc 681 race course rd, singapore
+Eg. /setloc city hall mrt
 -- You may copy and paste pluscode from google maps if current location is unknown.
 
 Please set your radius limit in km:
@@ -138,7 +138,7 @@ Unable to list nearby pokemons. You have not set your location.
 
 Please set the address of your current location:
 /setloc <address>
-Eg. /setloc 681 race course rd, singapore
+Eg. /setloc city hall mrt
 -- You may copy and paste pluscode from google maps if current location is unknown.
         '''
         telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
@@ -159,7 +159,7 @@ Eg. /setradius 1
         sorted_pokemon_within_radius, since = get_pokemons(
             geocode_latlon, radius, filter_iv=filter_iv, since=since)
         if sorted_pokemon_within_radius:
-            for pk in sorted_pokemon_within_radius:
+            for pk in sorted_pokemon_within_radius[:nearest]:
                 counter += 1
                 # print counter, pk["name"].upper()
                 message = "{0:<2} {1}\n".format(counter, pk["name"].upper())
@@ -190,32 +190,46 @@ def chat_action_end_monitor(user):
 
 
 def chat_action_set_loc(chat, chat_id, user):
-    get_string = chat[chat.find("/setloc ")+8:].lower()
-    # Check if 'sg' or 'singapore' found within address
-    add_tokens = get_string.split(" ")
-    if "sg" not in add_tokens and "singapore" not in add_tokens:
-        add_tokens += ["Singapore"]
-        get_string = " ".join(add_tokens)
+    if chat == "/setloc":
+        msg = "Please type your address after the command. Example:\n/setloc city hall mrt, singapore"
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+    else:
+        get_string = chat[chat.find("/setloc ")+8:].lower()
+        # Check if 'sg' or 'singapore' found within address
+        add_tokens = get_string.split(" ")
+        if "sg" not in add_tokens and "singapore" not in add_tokens:
+            add_tokens += ["Singapore"]
+            get_string = " ".join(add_tokens)
 
-    geocode_latlon, formatted_address = get_location(get_string)
-    user["loc"] = geocode_latlon
-    user["address"] = formatted_address
-    msg = "Location set to: {}".format(user["address"])
-    telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
-    return user
+        geocode_latlon, formatted_address = get_location(get_string)
+        user["loc"] = geocode_latlon
+        user["address"] = formatted_address
+        msg = "Location set to: {}\n\nTo check settings, tap /settings\nTo view pokemon around area, tap /list\nTo setup monitoring, tap /monitor".format(user["address"])
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+        return user
 
 
-def chat_action_set_radius(chat, chat_id, user):
-    get_string = chat[chat.find("/setradius ") + 11:].lower().replace("km", "")
-    radius = float(get_string)
+def set_radius(radius, chat_id, user):
     if radius > 5.0:
         msg = "Radius set is greater than 5 km. Please /setradius again."
         telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
     else:
         user["radius"] = radius
-        msg = "Radius set to   : {0:<3.2f} km".format(radius)
+        msg = "Radius set to   : {0:<3.2f} km\n\nTo check settings, tap /settings\nTo view pokemon around area, tap /list\nTo setup monitoring, tap /monitor".format(radius)
         telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
         return user
+
+
+def chat_action_set_radius(chat, chat_id, user):
+    if chat == "/setradius":
+        new_user = set_radius(1.0, chat_id, user)
+        msg = "If that is not what you want, please enter your preferred radius after the command. Example:\n/setradius 2"
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+        return new_user
+    else:
+        get_string = chat[chat.find("/setradius ") + 11:].lower().replace("km", "")
+        radius = float(get_string)
+        return set_radius(radius, chat_id, user)
 
 
 def chat_action_monitor(chat_id, user):
@@ -274,20 +288,35 @@ def chat_action_settings(chat_id, user):
     else:
         msg += "Monitoring : {}\n".format("Not set")
 
+    msg += "\n\nTo set radius, tap /setradius\nTo set IV filter, tap /filteriv\n\nTo view pokemon around area, tap /list\nTo setup monitoring, tap /monitor"
     telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
 
 
+def set_filter_iv(iv, chat_id, user):
+    user["iv"] = iv
+    msg = "IV filter set to   : {0:<3} %\n\nTo undo, tap /clearfilter\nTo check your settings here: /settings\n\nTo view pokemon around area, tap /list\nTo setup monitoring, tap /monitor".format(iv)
+    telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+    return user
+
+
 def chat_action_filter_iv(chat, chat_id, user):
-    get_string = chat[chat.find("/filteriv ") + 10:].lower().replace("%", "")
-    iv = int(get_string)
-    if iv < 0 or iv > 100:
-        msg = "IV filter must be between 0 - 100. Please /filteriv again."
+    if chat == "/filteriv":
+        new_user = set_filter_iv(80, chat_id, user)
+        msg = "If that is not what you want, please enter your preferred IV filter after the command. Example:\n/filteriv 90"
         telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+        return new_user
     else:
-        user["iv"] = iv
-        msg = "IV filter set to   : {0:<3} %\n\nTo undo, tap /clearfilter".format(iv)
-        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
-        return user
+        get_string = chat[chat.find("/filteriv ") + 10:].lower().replace("%", "")
+        try:
+            iv = int(get_string)
+            if iv < 0 or iv > 100:
+                msg = "IV filter must be between 0 - 100. Example:\n/filteriv 80"
+                telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+            else:
+                return set_filter_iv(iv, chat_id, user)
+        except ValueError:
+            msg = "Please enter IV filter between 0 - 100. Example:\n/filteriv 80"
+            telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
 
 
 def chat_action_clear_filter_iv(chat_id, user):
@@ -309,20 +338,20 @@ def chat_action(chat, chat_id, user):
     elif "/more" in chat:
         telegram_do(send_msg, params=[('text', more_filters)], chat_id=chat_id)
 
-    elif "/setloc " in chat:
+    elif "/setloc" in chat:
         return chat_action_set_loc(chat, chat_id, user)
 
-    elif "/setradius " in chat:
+    elif "/setradius" in chat:
         return chat_action_set_radius(chat, chat_id, user)
 
     elif "/monitor" in chat:
         return chat_action_monitor(chat_id, user)
 
-    elif "/filteriv " in chat:
+    elif "/filteriv" in chat:
         return chat_action_filter_iv(chat, chat_id, user)
 
     elif "/clearfilter" in chat:
-        return chat_action_clear_filter_iv(chat, chat_id, user)
+        return chat_action_clear_filter_iv(chat_id, user)
 
     elif "/stop" in chat:
         return chat_action_stop_monitor(chat_id, user)
@@ -347,7 +376,8 @@ def main():
     # }
     # Main code
     while True:
-        print("getting updates")
+        now = datetime.now().strftime("%Y-%m-%d  %I:%M:%S %p")
+        print("{} -- Polling...".format(now))
 
         # Monitoring mechanism
         for chat_id in users:
@@ -361,7 +391,7 @@ def main():
                         chat_id, user, since=user["since"], monitor=True)
 
         # Receiving telegram commands
-        updates = get_updates(offset=last_update_id, timeout='100')
+        updates = get_updates(offset=last_update_id, timeout='120')
         if len(updates) > 0:
             last_update_id = get_last_update_id(updates) + 1
 
@@ -374,13 +404,11 @@ def main():
                     users[chat_id] = {}
                 else:
                     user = users[chat_id]
-                    # print users
                     for chat in chats[chat_id]:
                         new_user = chat_action(chat, chat_id, user)
                         if new_user:
-                            print "if user"
                             users[chat_id] = new_user
-            print users
+            # print users
             time.sleep(0.5)
 
 if __name__ == '__main__':
