@@ -190,7 +190,14 @@ def chat_action_end_monitor(user):
 
 
 def chat_action_set_loc(chat, chat_id, user):
-    geocode_latlon, formatted_address = get_location(chat[chat.find("/setloc ")+8:])
+    get_string = chat[chat.find("/setloc ")+8:].lower()
+    # Check if 'sg' or 'singapore' found within address
+    add_tokens = get_string.split(" ")
+    if "sg" not in add_tokens and "singapore" not in add_tokens:
+        add_tokens += ["Singapore"]
+        get_string = " ".join(add_tokens)
+
+    geocode_latlon, formatted_address = get_location(get_string)
     user["loc"] = geocode_latlon
     user["address"] = formatted_address
     msg = "Location set to: {}".format(user["address"])
@@ -283,6 +290,18 @@ def chat_action_filter_iv(chat, chat_id, user):
         return user
 
 
+def chat_action_clear_filter_iv(chat_id, user):
+    filter_iv = user.get("iv", None)
+    if filter_iv:
+        msg = "Cleared IV filter.\nCheck your settings here: /settings\n"
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+        user["iv"] = None
+        return user
+    else:
+        msg = "No IV filter was set up."
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+
+
 def chat_action(chat, chat_id, user):
     if "/start" in chat or "/help" in chat:
         telegram_do(send_msg, params=[('text', greetings)], chat_id=chat_id)
@@ -301,6 +320,9 @@ def chat_action(chat, chat_id, user):
 
     elif "/filteriv " in chat:
         return chat_action_filter_iv(chat, chat_id, user)
+
+    elif "/clearfilter" in chat:
+        return chat_action_clear_filter_iv(chat, chat_id, user)
 
     elif "/stop" in chat:
         return chat_action_stop_monitor(chat_id, user)
@@ -322,14 +344,6 @@ def main():
     #         'radius': 2.0,
     #         'address': u'1 North Buona Vista Drive, Singapore 138675'
     #     },
-    #     283535375: {
-    #         'loc': (1.3137481, 103.8552258),
-    #         # 'monitor': 1492325116,
-    #         # 'since': 1492322711,
-    #         # 'radius': 1.0,
-    #         'address': u'681 Race Course Rd, Singapore',
-    #         # 'monitor_pretty': '2017-04-16 2:45:16 PM'
-    #     }
     # }
     # Main code
     while True:

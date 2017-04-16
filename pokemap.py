@@ -137,7 +137,7 @@ def get_pokemons(geocode_latlon, radius_in_km, filter_iv=None, since=None):
 
 
 if __name__ == "__main__":
-    address = "681 Race Course rd, SG"
+    address = "farrer park mrt sg"
     radius_in_km = 2
     geocode_latlon, formatted_address = get_location(address)
     # address = "6PH58V74+G3"
