@@ -38,18 +38,44 @@ Once you have set up these 2, you may use this bot to:
 /monitor
     - Monitor your location and radius and notify you of new spawns for the next 1 hour
 
-
-Other functions:
-/settings
-    - Check your current location, radius and monitoring settings
-
 /stop
     - Stop the monitoring
 
+Navigation functions:
+/settings
+    - Check your current location, radius and monitoring settings
+    - Also shows IV filter, excluded and included pokemons
+
 /help  or  /start
     - Get back to this screen
+
+----------------------------------
+
+For more filters, tap /more
+
+Thanks and enjoy!
 '''
 
+more_filters = '''
+You may set other filters too, such as:
+/filteriv <number>
+    - Filter for iv greater than specified %. By default, no IV filter is set.
+    - Eg. /filteriv 80
+
+/clearfilter
+    - Clears your pre-set IV filter. Restore to default. No IV filter is set.
+
+/exclude <pokemon>
+    - Excludes a particular pokemon from being tracked
+    - Eg. /exclude dratini
+
+/include
+    - Clears your existing exclusion list
+
+/include <pokemon>
+    - Includes a particular pokemon for tracking
+    - Eg. /include dratini
+'''
 
 def telegram_do(method, params=None, chat_id=None):
     if chat_id:
@@ -158,6 +184,10 @@ def chat_action_end_monitor(user):
 def chat_action(chat, chat_id, user):
     if "/start" in chat or "/help" in chat:
         telegram_do(send_msg, params=[('text', greetings)], chat_id=chat_id)
+
+    elif "/more" in chat:
+        telegram_do(send_msg, params=[('text', more_filters)], chat_id=chat_id)
+
     elif "/setloc " in chat:
         geocode_latlon, formatted_address = get_location(chat[chat.find("/setloc ")+8:])
         user["loc"] = geocode_latlon
@@ -181,12 +211,15 @@ def chat_action(chat, chat_id, user):
         if since:
             monitor_till = datetime.now() + timedelta(hours=1)
             monitor_till_ts = int(time.mktime(monitor_till.timetuple()))
+            monitor_pretty = monitor_till.strftime("%Y-%m-%d %-I:%M:%S %p")
             user["monitor"] = monitor_till_ts
-            user["monitor_pretty"] = monitor_till.strftime("%Y-%m-%d %-I:%M:%S %p")
+            user["monitor_pretty"] = monitor_pretty
             user["since"] = since
             # time_left = datetime.fromtimestamp(monitor_till_ts) - datetime.now()
             # minutes, seconds = divmod(time_left.seconds, 60)
             # print "{:<2} mins {:<2} sec".format(minutes, seconds)
+            msg = "Monitoring set until : {}".format(monitor_pretty)
+            telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
             return user
 
     elif "/stop" in chat:
