@@ -80,7 +80,7 @@ def get_location(address):
     return geocode_latlon, formatted_address
 
 
-def get_pokemon_within_radius(geocode_latlon, radius_in_km, since=None):
+def get_pokemons(geocode_latlon, radius_in_km, filter_iv=None, since=None):
     if since:
         params = (
             ('since', since),
@@ -102,19 +102,37 @@ def get_pokemon_within_radius(geocode_latlon, radius_in_km, since=None):
     # Set radius in km
     pokemon_within_radius = []
 
+    # Filter for pokemons within radius
     for pokemon in pokemons:
         poke_latlon = get_latlong(pokemon)
         pokemon['km_from_location'] = haversine(geocode_latlon, poke_latlon)
         if pokemon['km_from_location'] < radius_in_km:
+            # Get pokemon name
             pokemon['name'] = pokedex[int(pokemon['pokemon_id']) - 1]
-            pokemon_within_radius += [pokemon]
+            # Get time left before despawn
             time_left = datetime.fromtimestamp(int(pokemon["despawn"])) - datetime.now()
             minutes, seconds = divmod(time_left.seconds, 60)
             pokemon['time_left_secs'] = "{:<2} mins {:<2} sec".format(minutes, seconds)
+            # Get pokemon IV percentage
             stats = ["attack", "defence", "stamina"]
             pokemon['iv'] = int(sum([int(pokemon[stat]) for stat in stats]) / 45.0 * 100)
 
-    sorted_pokemon_within_radius = sorted(pokemon_within_radius, key=lambda k: k['km_from_location']) 
+            pokemon_within_radius += [pokemon]
+
+    # Filter for pokemons greater than filtered IV
+    if filter_iv:
+        print "filter_iv"
+        pokemons_filtered = []
+        for pokemon in pokemon_within_radius:
+            if pokemon['iv'] >= int(filter_iv):
+                pokemons_filtered += [pokemon]
+    else:
+        print "Don't filter"
+        pokemons_filtered = pokemon_within_radius
+
+    # Sort by distance from location
+    sorted_pokemon_within_radius = sorted(pokemons_filtered, key=lambda k: k['km_from_location']) 
+
     return sorted_pokemon_within_radius, since["inserted"]
 
 
@@ -123,4 +141,5 @@ if __name__ == "__main__":
     radius_in_km = 2
     geocode_latlon, formatted_address = get_location(address)
     # address = "6PH58V74+G3"
-    sorted_pokemon_within_radius, since = get_pokemon_within_radius(geocode_latlon, radius_in_km)
+    sorted_pokemon_within_radius, since = get_pokemon_within_radius(
+        geocode_latlon, radius_in_km, filter_iv=70)

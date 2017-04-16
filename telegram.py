@@ -1,4 +1,4 @@
-from get_pokemons import get_location, get_pokemon_within_radius
+from pokemap import get_location, get_pokemons
 from datetime import datetime, timedelta
 import requests
 import time
@@ -154,7 +154,7 @@ Eg. /setradius 1
 
     else:
         counter = 0
-        sorted_pokemon_within_radius, since = get_pokemon_within_radius(geocode_latlon, radius, since=since)
+        sorted_pokemon_within_radius, since = get_pokemons(geocode_latlon, radius, since=since)
         if sorted_pokemon_within_radius:
             for pk in sorted_pokemon_within_radius:
                 counter += 1
@@ -181,6 +181,83 @@ def chat_action_end_monitor(user):
     return user
 
 
+def chat_action_set_loc(chat, chat_id, user):
+    geocode_latlon, formatted_address = get_location(chat[chat.find("/setloc ")+8:])
+    user["loc"] = geocode_latlon
+    user["address"] = formatted_address
+    msg = "Location set to: {}".format(user["address"])
+    telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+    return user
+
+
+def chat_action_set_radius(chat, chat_id, user):
+    get_string = chat[chat.find("/setradius ") + 11:].lower().replace("km", "")
+    radius = float(get_string)
+    if radius > 5.0:
+        msg = "Radius set is greater than 5 km. Please /setradius again."
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+    else:
+        user["radius"] = radius
+        msg = "Radius set to   : {0:<3.2f} km".format(radius)
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+        return user
+
+
+def chat_action_monitor(chat_id, user):
+    since = chat_action_list(chat_id, user)
+    if since:
+        monitor_till = datetime.now() + timedelta(hours=1)
+        monitor_till_ts = int(time.mktime(monitor_till.timetuple()))
+        monitor_pretty = monitor_till.strftime("%Y-%m-%d %-I:%M:%S %p")
+        user["monitor"] = monitor_till_ts
+        user["monitor_pretty"] = monitor_pretty
+        user["since"] = since
+        # time_left = datetime.fromtimestamp(monitor_till_ts) - datetime.now()
+        # minutes, seconds = divmod(time_left.seconds, 60)
+        # print "{:<2} mins {:<2} sec".format(minutes, seconds)
+        msg = "Monitoring set until : {}".format(monitor_pretty)
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+        return user
+
+
+def chat_action_stop_monitor(chat_id, user):
+    monitoring = user.get("monitor", None)
+    if monitoring:
+        if monitoring == "Expired":
+            msg = "Monitoring has expired."
+            telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+        else:
+            msg = "Monitoring stopped."
+            telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+            return chat_action_end_monitor(user)
+    else:
+        msg = "No monitoring was set up."
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+
+
+def chat_action_settings(chat_id, user):
+    address = user.get("address", None)
+    radius = user.get("radius", None)
+    monitor_pretty = user.get("monitor_pretty", None)
+
+    if address:
+        msg = "Location : {}\n".format(address)
+    else:
+        msg = "Location : {}\n".format("Not set")
+
+    if radius:
+        msg += "Radius    : {} km\n".format(radius)
+    else:
+        msg += "Radius    : {}\n".format("Not set")
+
+    if monitor_pretty:
+        msg += "Monitoring : {}\n".format(monitor_pretty)
+    else:
+        msg += "Monitoring : {}\n".format("Not set")
+
+    telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+
+
 def chat_action(chat, chat_id, user):
     if "/start" in chat or "/help" in chat:
         telegram_do(send_msg, params=[('text', greetings)], chat_id=chat_id)
@@ -189,74 +266,19 @@ def chat_action(chat, chat_id, user):
         telegram_do(send_msg, params=[('text', more_filters)], chat_id=chat_id)
 
     elif "/setloc " in chat:
-        geocode_latlon, formatted_address = get_location(chat[chat.find("/setloc ")+8:])
-        user["loc"] = geocode_latlon
-        user["address"] = formatted_address
-        msg = "Location set to: {}".format(user["address"])
-        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
-        return user
+        return chat_action_set_loc(chat, chat_id, user)
+
     elif "/setradius " in chat:
-        radius = float(chat[chat.find("/setradius ") + 11:])
-        if radius > 5.0:
-            msg = "Radius set is greater than 5 km. Please /setradius again."
-            telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
-        else:
-            user["radius"] = radius
-            msg = "Radius set to   : {0:<3.2f} km".format(radius)
-            telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
-            return user
+        return chat_action_set_radius(chat, chat_id, user)
 
     elif "/monitor" in chat:
-        since = chat_action_list(chat_id, user)
-        if since:
-            monitor_till = datetime.now() + timedelta(hours=1)
-            monitor_till_ts = int(time.mktime(monitor_till.timetuple()))
-            monitor_pretty = monitor_till.strftime("%Y-%m-%d %-I:%M:%S %p")
-            user["monitor"] = monitor_till_ts
-            user["monitor_pretty"] = monitor_pretty
-            user["since"] = since
-            # time_left = datetime.fromtimestamp(monitor_till_ts) - datetime.now()
-            # minutes, seconds = divmod(time_left.seconds, 60)
-            # print "{:<2} mins {:<2} sec".format(minutes, seconds)
-            msg = "Monitoring set until : {}".format(monitor_pretty)
-            telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
-            return user
+        return chat_action_monitor(chat_id, user)
 
     elif "/stop" in chat:
-        monitoring = user.get("monitor", None)
-        if monitoring:
-            if monitoring == "Expired":
-                msg = "Monitoring has expired."
-                telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
-            else:
-                msg = "Monitoring stopped."
-                telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
-                return chat_action_end_monitor(user)
-        else:
-            msg = "No monitoring was set up."
-            telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+        return chat_action_stop_monitor(chat_id, user)
 
     elif "/settings" in chat:
-        address = user.get("address", None)
-        radius = user.get("radius", None)
-        monitor_pretty = user.get("monitor_pretty", None)
-
-        if address:
-            msg = "Location : {}\n".format(address)
-        else:
-            msg = "Location : {}\n".format("Not set")
-
-        if radius:
-            msg += "Radius    : {} km\n".format(radius)
-        else:
-            msg += "Radius    : {}\n".format("Not set")
-
-        if monitor_pretty:
-            msg += "Monitoring : {}\n".format(monitor_pretty)
-        else:
-            msg += "Monitoring : {}\n".format("Not set")
-
-        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+        chat_action_settings(chat_id, user)
 
     elif "/list" in chat:
         chat_action_list(chat_id, user)
