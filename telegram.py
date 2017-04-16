@@ -1,5 +1,4 @@
 from get_pokemons import get_location, get_pokemon_within_radius
-from IPython import embed
 from datetime import datetime, timedelta
 import requests
 import time

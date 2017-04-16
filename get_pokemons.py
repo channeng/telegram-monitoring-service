@@ -2,7 +2,7 @@ import requests
 from math import radians, cos, sin, asin, sqrt
 from datetime import datetime
 import os
-from IPython import embed
+
 
 geocode_api_key = os.environ["GOOGLE_GEOCODE_API"]
 
@@ -124,4 +124,3 @@ if __name__ == "__main__":
     geocode_latlon, formatted_address = get_location(address)
     # address = "6PH58V74+G3"
     sorted_pokemon_within_radius, since = get_pokemon_within_radius(geocode_latlon, radius_in_km)
-    embed()
