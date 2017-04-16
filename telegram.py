@@ -5,8 +5,8 @@ import time
 import os
 
 # Set up Telegram bot
-pokesg_username = os.environ["TELE_POKESG_USER"]
-pokesg_api = os.environ["TELE_POKESG_API"]
+pokesg_username = os.environ["TELE_POKEBACON_USER"]
+pokesg_api = os.environ["TELE_POKEBACON_API"]
 endpoint = "https://api.telegram.org/bot{}/".format(pokesg_api)
 
 send_msg = endpoint + "sendMessage"
