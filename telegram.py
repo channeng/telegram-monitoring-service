@@ -161,6 +161,7 @@ Eg. /setradius 1
                 # print counter, pk["name"].upper()
                 message = "{0:<2} {1}\n".format(counter, pk["name"].upper())
                 message += "Distance    : {0:<3.2f} km\n".format(pk["km_from_location"])
+                message += "IV percent  : {0:<3} %\n".format(pk["iv"])
                 message += "Despawn in : {}\n\n".format(pk["time_left_secs"])
                 # Send pokemon summary
                 msg_params = [('text', message)]

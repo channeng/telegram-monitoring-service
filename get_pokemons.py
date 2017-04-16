@@ -112,7 +112,7 @@ def get_pokemon_within_radius(geocode_latlon, radius_in_km, since=None):
             minutes, seconds = divmod(time_left.seconds, 60)
             pokemon['time_left_secs'] = "{:<2} mins {:<2} sec".format(minutes, seconds)
             stats = ["attack", "defence", "stamina"]
-            pokemon['iv'] = sum([int(pokemon[stat]) for stat in stats])/45.0
+            pokemon['iv'] = int(sum([int(pokemon[stat]) for stat in stats]) / 45.0 * 100)
 
     sorted_pokemon_within_radius = sorted(pokemon_within_radius, key=lambda k: k['km_from_location']) 
     return sorted_pokemon_within_radius, since["inserted"]
