@@ -111,9 +111,11 @@ def get_updates(offset=None, timeout=None):
     return telegram_do(ep_get_updates, params=params)['result']
 
 
-def chat_action_list(chat_id, user, since=None):
+def chat_action_list(chat_id, user, since=None, monitor=False):
     geocode_latlon = user.get("loc", "")
     radius = user.get("radius", "")
+    filter_iv = user.get("iv", None)
+
     if geocode_latlon == "" and radius == "":
         msg = '''
 Unable to list nearby pokemons. You have not set your location and radius.
@@ -154,7 +156,8 @@ Eg. /setradius 1
 
     else:
         counter = 0
-        sorted_pokemon_within_radius, since = get_pokemons(geocode_latlon, radius, since=since)
+        sorted_pokemon_within_radius, since = get_pokemons(
+            geocode_latlon, radius, filter_iv=filter_iv, since=since)
         if sorted_pokemon_within_radius:
             for pk in sorted_pokemon_within_radius:
                 counter += 1
@@ -171,6 +174,11 @@ Eg. /setradius 1
                 longitude = pk['lng']
                 loc_params = [('latitude', latitude), ('longitude', longitude)]
                 loc = telegram_do(send_loc, params=loc_params, chat_id=chat_id)
+        else:
+            if not monitor:
+                message = "Sorry, no pokemons found nearby :/"
+                msg_params = [('text', message)]
+                summary_msg = telegram_do(send_msg, params=msg_params, chat_id=chat_id)
         return since
 
 
@@ -215,7 +223,7 @@ def chat_action_monitor(chat_id, user):
         # time_left = datetime.fromtimestamp(monitor_till_ts) - datetime.now()
         # minutes, seconds = divmod(time_left.seconds, 60)
         # print "{:<2} mins {:<2} sec".format(minutes, seconds)
-        msg = "Monitoring set until : {}".format(monitor_pretty)
+        msg = "Monitoring set until : {}\n\nTo undo, tap /stop".format(monitor_pretty)
         telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
         return user
 
@@ -238,6 +246,7 @@ def chat_action_stop_monitor(chat_id, user):
 def chat_action_settings(chat_id, user):
     address = user.get("address", None)
     radius = user.get("radius", None)
+    filter_iv = user.get("iv", None)
     monitor_pretty = user.get("monitor_pretty", None)
 
     if address:
@@ -250,12 +259,28 @@ def chat_action_settings(chat_id, user):
     else:
         msg += "Radius    : {}\n".format("Not set")
 
+    if filter_iv:
+        msg += "IV filtered > {} %\n".format(filter_iv)
+
     if monitor_pretty:
         msg += "Monitoring : {}\n".format(monitor_pretty)
     else:
         msg += "Monitoring : {}\n".format("Not set")
 
     telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+
+
+def chat_action_filter_iv(chat, chat_id, user):
+    get_string = chat[chat.find("/filteriv ") + 10:].lower().replace("%", "")
+    iv = int(get_string)
+    if iv < 0 or iv > 100:
+        msg = "IV filter must be between 0 - 100. Please /filteriv again."
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+    else:
+        user["iv"] = iv
+        msg = "IV filter set to   : {0:<3} %\n\nTo undo, tap /clearfilter".format(iv)
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+        return user
 
 
 def chat_action(chat, chat_id, user):
@@ -273,6 +298,9 @@ def chat_action(chat, chat_id, user):
 
     elif "/monitor" in chat:
         return chat_action_monitor(chat_id, user)
+
+    elif "/filteriv " in chat:
+        return chat_action_filter_iv(chat, chat_id, user)
 
     elif "/stop" in chat:
         return chat_action_stop_monitor(chat_id, user)
@@ -316,7 +344,7 @@ def main():
                     users[chat_id] = chat_action_end_monitor(user)
                 else:
                     users[chat_id]["since"] = chat_action_list(
-                        chat_id, user, since=user["since"])
+                        chat_id, user, since=user["since"], monitor=True)
 
         # Receiving telegram commands
         updates = get_updates(offset=last_update_id, timeout='100')
