@@ -1,0 +1,6 @@
+**/*.csv
+**/.DS_Store
+**/*.pyc
+**/*.sqlite
+**/config.py
+**/logs/
