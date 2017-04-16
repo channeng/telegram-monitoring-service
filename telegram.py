@@ -93,9 +93,12 @@ def get_all_chats(updates):
     chats = {}
     for update in updates:
         chat_id = update["message"]["chat"]["id"]
+        update["message"]["chat"].pop('id')
+        from_user = update["message"]["chat"]
         text = update["message"]["text"]
-        chats[chat_id] = chats.get(chat_id, [])
-        chats[chat_id] += [text]
+        chats[chat_id] = chats.get(chat_id, {"chats": []})
+        chats[chat_id]["chats"] += [text]
+        chats[chat_id]["from"] = from_user
     return chats
     # telegram_do(send_msg, params=[('text', text)], chat_id=chat)
 
@@ -375,20 +378,10 @@ def main():
     #     },
     # }
     # Main code
+    last_monitored = datetime.now() - timedelta(hours=1)
     while True:
-        now = datetime.now().strftime("%Y-%m-%d  %I:%M:%S %p")
-        print("{} -- Polling...".format(now))
-
-        # Monitoring mechanism
-        for chat_id in users:
-            user = users[chat_id]
-            monitor = user.get("monitor", None)
-            if monitor:
-                if datetime.fromtimestamp(monitor) < datetime.now():
-                    users[chat_id] = chat_action_end_monitor(user)
-                else:
-                    users[chat_id]["since"] = chat_action_list(
-                        chat_id, user, since=user["since"], monitor=True)
+        now = datetime.now()
+        print("{} -- Polling...".format(now.strftime("%Y-%m-%d  %I:%M:%S %p")))
 
         # Receiving telegram commands
         updates = get_updates(offset=last_update_id, timeout='120')
@@ -397,19 +390,49 @@ def main():
 
             # Gets only the last updated
             chats = get_all_chats(updates)
+            for chat in chats:
+                conv = chats[chat]
+                name = "{:>10} {}: ".format(
+                    conv["from"]["first_name"],
+                    conv["from"]["last_name"])
+                print name,
+                for message in conv["chats"]:
+                    print message
 
             for chat_id in chats:
+                # Send welcome message if user is not previously seen
                 if chat_id not in users.keys():
                     telegram_do(send_msg, params=[('text', greetings)], chat_id=chat_id)
                     users[chat_id] = {}
+                # Loop through new chats, and determine chat action
                 else:
                     user = users[chat_id]
-                    for chat in chats[chat_id]:
+                    for chat in chats[chat_id]["chats"]:
                         new_user = chat_action(chat, chat_id, user)
                         if new_user:
                             users[chat_id] = new_user
             # print users
             time.sleep(0.5)
+
+        # Monitoring mechanism
+        # -- Runs only if time last monitored is more than 100s ago
+        check_now = datetime.now()
+        time_since_last_monitored = check_now - last_monitored
+        if time_since_last_monitored.total_seconds() > 100:
+            print("{} -- Trigger monitor".format(
+                check_now.strftime("%Y-%m-%d  %I:%M:%S %p")))
+            # Execute monitoring
+            for chat_id in users:
+                user = users[chat_id]
+                monitor = user.get("monitor", None)
+                if monitor:
+                    if datetime.fromtimestamp(monitor) < datetime.now():
+                        users[chat_id] = chat_action_end_monitor(user)
+                    else:
+                        users[chat_id]["since"] = chat_action_list(
+                            chat_id, user, since=user["since"], monitor=True)
+
+            last_monitored = check_now
 
 if __name__ == '__main__':
     main()
