@@ -95,10 +95,23 @@ def get_all_chats(updates):
         chat_id = update["message"]["chat"]["id"]
         update["message"]["chat"].pop('id')
         from_user = update["message"]["chat"]
-        text = update["message"]["text"]
         chats[chat_id] = chats.get(chat_id, {"chats": []})
-        chats[chat_id]["chats"] += [text]
         chats[chat_id]["from"] = from_user
+        text = update["message"].get("text", None)
+        if text:
+            chats[chat_id]["chats"] += [text]
+        else:
+            other_msg_types = set(["location", "contact", "photo"])
+            list_message_type = list(other_msg_types.intersection(set(update["message"])))
+            if len(list_message_type) > 0:
+                message_type = list_message_type[0]
+                chats[chat_id]["chats"] += ["Sent {}".format(message_type)]
+                msg = "Sorry, I cannot accept your {} :(".format(message_type)
+                telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+            else:
+                chats[chat_id]["chats"] += ["Unrecognized message type"]
+                msg = "Sorry, I don't get it :("
+                telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
     return chats
     # telegram_do(send_msg, params=[('text', text)], chat_id=chat)
 
