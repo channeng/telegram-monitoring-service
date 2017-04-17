@@ -347,6 +347,14 @@ def chat_action_clear_filter_iv(chat_id, user):
         telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
 
 
+def chat_action_repeat(chat, chat_id):
+    if ("copy" in chat.lower() or "stop" in chat.lower()) and "/" not in chat:
+        msg = "Hahaha 8-) I'll stop if you give me a command! Like: /list"
+        telegram_do(send_msg, params=[('text', msg)], chat_id=chat_id)
+    else:
+        telegram_do(send_msg, params=[('text', chat)], chat_id=chat_id)
+
+
 def chat_action(chat, chat_id, user):
     if "/start" in chat or "/help" in chat:
         telegram_do(send_msg, params=[('text', greetings)], chat_id=chat_id)
@@ -377,6 +385,9 @@ def chat_action(chat, chat_id, user):
 
     elif "/list" in chat:
         chat_action_list(chat_id, user)
+    else:
+        chat_action_repeat(chat, chat_id)
+
 
 
 def main():
